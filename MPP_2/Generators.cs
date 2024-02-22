@@ -40,13 +40,125 @@ namespace MPP_2
                 var f = type.GetInterfaces();
                 foreach (var temp in f)
                 {
-                    if (temp.Name.Contains("IList") && temp.GenericTypeArguments.Length > 0)
+                    if (temp.Name.Contains("IList`1") && temp.GenericTypeArguments.Length > 0)
                     {
                         return valueGenerators[typeof(IList)](temp);
                     }
                 }
             }
             return valueGenerators[type](type);
+        }
+
+        public static object GenerateDTO(Type type) {
+            HashSet<Type> usedtypes = [];
+            
+            object InnerGenerator(Type type, bool considerType = true)
+            {
+                if (!usedtypes.Add(type) && considerType) throw new Exception("LoopDetected");
+                ConstructorInfo constructor = null;
+                var privateFields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(field => !field.Name.Contains(">k__BackingField")).ToList();
+                var privateProperties = type.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance).Concat(type.GetProperties().Where(prop => ((prop.SetMethod == null) || (prop.SetMethod!=null && !prop.SetMethod.IsPublic))).ToList()).ToList();
+                var privateMembers = privateFields.Select(member => member.Name.ToLower()).ToList().Union(privateProperties.Select(member => member.Name.ToLower()).ToList()).ToList();
+                int privateMembersMaxAmount = -1;
+                foreach (var constr in type.GetConstructors())
+                {
+                    int privateMembersAmount = 0;
+                    foreach (var param in constr.GetParameters()) {
+                        if (privateMembers.Contains(param.Name!.ToLower())) privateMembersAmount++;
+                    }
+                    if (constr.IsPublic && privateMembersAmount > privateMembersMaxAmount)
+                    {
+                        privateMembersMaxAmount = privateMembersAmount;
+                        constructor = constr;
+                    }
+                }
+                if (constructor == null) throw new Exception("no public constructor");
+                List<object> parameters = [];
+                foreach (var parameter in constructor.GetParameters())
+                {
+                    try
+                    {
+                        parameters.Add(Generate(parameter.ParameterType));
+                    } catch (KeyNotFoundException) {
+                        parameters.Add(InnerGenerator(parameter.ParameterType));
+                    }
+                }
+                var a = constructor.Invoke(parameters.ToArray());
+                List<FieldInfo> fields = new List<FieldInfo>();
+                foreach (var field in type.GetFields())
+                {
+                    if (field.IsPublic) fields.Add(field);
+                }
+
+                List<PropertyInfo> properties = new List<PropertyInfo>();
+                foreach (var propertie in type.GetProperties())
+                {
+                    if (propertie.GetMethod!.IsPublic) properties.Add(propertie);
+                }
+
+                List<FieldInfo> fieldErrors = new List<FieldInfo>();
+                foreach (var field in fields)
+                {
+                    try
+                    {
+                        field.SetValue(a, Generate(field.FieldType));
+                    }
+                    catch (KeyNotFoundException)
+                    {
+                        fieldErrors.Add(field);
+                    }
+                }
+
+                List<PropertyInfo> propErrors = new List<PropertyInfo>();
+                foreach (var prop in properties)
+                {
+                    try
+                    {
+                        prop.SetValue(a, Generate(prop.PropertyType));
+                    }
+                    catch (KeyNotFoundException)
+                    {
+                        propErrors.Add(prop);
+                    }
+                }
+
+                foreach (var member in fieldErrors)
+                {
+                    if (member.FieldType.GetInterfaces().Contains(typeof(IList)))
+                    {
+                        var f = member.FieldType.GetInterfaces();
+                        foreach (var temp in f)
+                        {
+                            if (temp.Name.Contains("IList`1") && temp.GenericTypeArguments.Length > 0 && !temp.GenericTypeArguments[0].FullName.Contains("System."))
+                            {
+                                Random random = new Random();
+                                object obj = new object();
+                                int length = random.Next(3,6);
+                                Type listType = typeof(List<>).MakeGenericType(temp.GenericTypeArguments[0]);
+                                var res = (IList)Convert.ChangeType(Activator.CreateInstance(listType), listType);
+                                if(!usedtypes.Contains(temp.GenericTypeArguments[0])) res.Add(InnerGenerator(temp.GenericTypeArguments[0]));
+                                for (int i = 0; i < length; i++)
+                                {
+                                    obj = InnerGenerator(temp.GenericTypeArguments[0], false);
+                                    Convert.ChangeType(obj, temp.GenericTypeArguments[0]);
+                                    res.Add(obj);
+                                }
+                                member.SetValue(a, res);
+                            }
+                        }
+                    }
+                    else if (member.FieldType.Assembly.FullName.Contains("System."))
+                    {
+                        throw new NotImplementedException($"type {member.FieldType} not implemented");
+                    }
+                    else
+                    {
+                        member.SetValue(a, InnerGenerator(member.FieldType));
+                    }
+                }
+                return a;
+            }
+            return InnerGenerator(type);
         }
 
         private static object generateInt(Type type) => random.Next();
