@@ -1,9 +1,23 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
 using MPP_2;
+using MPP_2.Faker;
+using MPP_2.MyGenerator;
+using System.Reflection;
 
 Faker f = new Faker();
 f.Create<TestClass>();
+FakerConfig config = new FakerConfig();
+config.Add<TestClass, int, ICustomGenerator>(testc => testc.a);
+
+public class Gen : ICustomGenerator
+{
+    public T Generate<T>()
+    {
+        throw new NotImplementedException();
+    }
+}
+
 public class TestClass {
 
     public int a;

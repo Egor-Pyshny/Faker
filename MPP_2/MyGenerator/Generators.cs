@@ -1,12 +1,9 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
+using MPP_2.Faker;
+using MPP_2.MyFaker;
 
-namespace MPP_2
+namespace MPP_2.MyGenerator
 {
     public static class Generators
     {
@@ -34,7 +31,8 @@ namespace MPP_2
         };
 
 
-        public static object Generate(Type type) {
+        private static object Generate(Type type)
+        {
             if (type.GetInterfaces().Contains(typeof(IList)))
             {
                 var f = type.GetInterfaces();
@@ -49,21 +47,24 @@ namespace MPP_2
             return valueGenerators[type](type);
         }
 
-        public static object GenerateDTO(Type type) {
+        public static object GenerateDTO(Type type, FakerConfig? config = null)
+        {
             HashSet<Type> usedtypes = [];
-            
+
             object InnerGenerator(Type type, bool considerType = true)
             {
                 if (!usedtypes.Add(type) && considerType) throw new Exception("LoopDetected");
                 ConstructorInfo constructor = null;
+                var asdasd = type.GetMembers();
                 var privateFields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(field => !field.Name.Contains(">k__BackingField")).ToList();
-                var privateProperties = type.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance).Concat(type.GetProperties().Where(prop => ((prop.SetMethod == null) || (prop.SetMethod!=null && !prop.SetMethod.IsPublic))).ToList()).ToList();
+                var privateProperties = type.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance).Concat(type.GetProperties().Where(prop => prop.SetMethod == null || prop.SetMethod != null && !prop.SetMethod.IsPublic).ToList()).ToList();
                 var privateMembers = privateFields.Select(member => member.Name.ToLower()).ToList().Union(privateProperties.Select(member => member.Name.ToLower()).ToList()).ToList();
                 int privateMembersMaxAmount = -1;
                 foreach (var constr in type.GetConstructors())
                 {
                     int privateMembersAmount = 0;
-                    foreach (var param in constr.GetParameters()) {
+                    foreach (var param in constr.GetParameters())
+                    {
                         if (privateMembers.Contains(param.Name!.ToLower())) privateMembersAmount++;
                     }
                     if (constr.IsPublic && privateMembersAmount > privateMembersMaxAmount)
@@ -79,7 +80,9 @@ namespace MPP_2
                     try
                     {
                         parameters.Add(Generate(parameter.ParameterType));
-                    } catch (KeyNotFoundException) {
+                    }
+                    catch (KeyNotFoundException)
+                    {
                         parameters.Add(InnerGenerator(parameter.ParameterType));
                     }
                 }
@@ -133,10 +136,10 @@ namespace MPP_2
                             {
                                 Random random = new Random();
                                 object obj = new object();
-                                int length = random.Next(3,6);
+                                int length = random.Next(3, 6);
                                 Type listType = typeof(List<>).MakeGenericType(temp.GenericTypeArguments[0]);
                                 var res = (IList)Convert.ChangeType(Activator.CreateInstance(listType), listType);
-                                if(!usedtypes.Contains(temp.GenericTypeArguments[0])) res.Add(InnerGenerator(temp.GenericTypeArguments[0]));
+                                if (!usedtypes.Contains(temp.GenericTypeArguments[0])) res.Add(InnerGenerator(temp.GenericTypeArguments[0]));
                                 for (int i = 0; i < length; i++)
                                 {
                                     obj = InnerGenerator(temp.GenericTypeArguments[0], false);
@@ -158,7 +161,10 @@ namespace MPP_2
                 }
                 return a;
             }
-            return InnerGenerator(type);
+            if (type.Assembly.FullName.Contains("System."))
+                return Generate(type);
+            else
+                return InnerGenerator(type);
         }
 
         private static object generateInt(Type type) => random.Next();
@@ -173,7 +179,7 @@ namespace MPP_2
 
         private static object generateSByte(Type type) => (sbyte)random.Next(sbyte.MinValue, sbyte.MaxValue + 1);
 
-        private static object generateBool(Type type) => (random.Next(2) == 0);
+        private static object generateBool(Type type) => random.Next(2) == 0;
 
         private static object generateUInt(Type type) => (uint)random.Next();
 
@@ -185,14 +191,15 @@ namespace MPP_2
 
         private static object generateObject(Type type) => random.Next();
 
-        private static object generateString(Type type) {
+        private static object generateString(Type type)
+        {
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
             int length = random.Next(10, 20);
             return new string(Enumerable.Repeat(chars, length).Select(s => s[random.Next(s.Length)]).ToArray());
         }
 
         private static object generateDateTime(Type type) => new DateTime(
-                                                            year: random.Next(0,DateTime.Now.Year+1),
+                                                            year: random.Next(0, DateTime.Now.Year + 1),
                                                             month: random.Next(0, 13),
                                                             day: random.Next(0, 28),
                                                             hour: random.Next(0, 25),
@@ -222,6 +229,6 @@ namespace MPP_2
                 res.Add(obj);
             }
             return res;
-        }      
+        }
     }
 }
