@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Reflection;
 using System.Reflection.Metadata;
+using MPP_2.Exceptions;
 using MPP_2.Faker;
 using MPP_2.MyFaker;
 
@@ -51,10 +52,10 @@ namespace MPP_2.MyGenerator
         public static object GenerateDTO(Type type, Dictionary<MemberInfo, Type>? config = null)
         {
             HashSet<Type> usedtypes = [];
-            if (config != null) config = new Dictionary<MemberInfo, Type>();
+            if (config == null) config = new Dictionary<MemberInfo, Type>();
             object InnerGenerator(Type type, bool considerType = true)
             {
-                if (!usedtypes.Add(type) && considerType) throw new Exception("LoopDetected");
+                if (considerType && !usedtypes.Add(type) ) throw new CyclicDependenceException(usedtypes, type);
                 ConstructorInfo? constructor = null;
                 var asdasd = type.GetMembers();
                 var privateFields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(field => !field.Name.Contains(">k__BackingField")).ToList();
@@ -74,7 +75,7 @@ namespace MPP_2.MyGenerator
                         constructor = constr;
                     }
                 }
-                if (constructor == null) throw new Exception("no public constructor");
+                if (constructor == null) throw new NoPublicConstructorException(type);
                 List<object> parameters = [];
                 foreach (var parameter in constructor.GetParameters())
                 {
@@ -109,7 +110,8 @@ namespace MPP_2.MyGenerator
                     if (propertie.SetMethod!= null && propertie.SetMethod.IsPublic) properties.Add(propertie);
                 }
 
-                List<FieldInfo> fieldErrors = new List<FieldInfo>();
+                List<MemberInfo> errors = new List<MemberInfo>();
+
                 foreach (var field in fields)
                 {
                     try
@@ -127,11 +129,10 @@ namespace MPP_2.MyGenerator
                     }
                     catch (KeyNotFoundException)
                     {
-                        fieldErrors.Add(field);
+                        errors.Add(field);
                     }
                 }
 
-                List<PropertyInfo> propErrors = new List<PropertyInfo>();
                 foreach (var prop in properties)
                 {
                     try
@@ -150,42 +151,23 @@ namespace MPP_2.MyGenerator
                     }
                     catch (KeyNotFoundException)
                     {
-                        propErrors.Add(prop);
+                        errors.Add(prop);
+                        object obj;
+                        if (prop.PropertyType.FullName!.Contains("System."))
+                            throw new NotImplementedException($"Generator for type {prop.PropertyType} has not been implemented yet");
+                        else
+                            obj = GenerateDTO(prop.PropertyType);
+                        prop.SetValue(a, obj);
                     }
-                }
-
-                foreach (var member in fieldErrors)
-                {
-                    if (member.FieldType.GetInterfaces().Contains(typeof(IList)))
+                    foreach (MemberInfo member in errors)
                     {
-                        var f = member.FieldType.GetInterfaces();
+                        Type typeOfMember = member.MemberType == MemberTypes.Field ? (member as FieldInfo)!.FieldType : (member as PropertyInfo)!.PropertyType;
+                        /*var f = member.FieldType.GetInterfaces();
                         foreach (var temp in f)
                         {
                             if (temp.Name.Contains("IList`1") && temp.GenericTypeArguments.Length > 0 && !temp.GenericTypeArguments[0].FullName!.Contains("System."))
                             {
-                                Random random = new Random();
-                                object obj = new object();
-                                int length = random.Next(3, 6);
-                                Type listType = typeof(List<>).MakeGenericType(temp.GenericTypeArguments[0]);
-                                var res = (IList)Convert.ChangeType(Activator.CreateInstance(listType), listType)!;
-                                if (!usedtypes.Contains(temp.GenericTypeArguments[0])) res.Add(InnerGenerator(temp.GenericTypeArguments[0]));
-                                for (int i = 0; i < length; i++)
-                                {
-                                    obj = InnerGenerator(temp.GenericTypeArguments[0], false);
-                                    Convert.ChangeType(obj, temp.GenericTypeArguments[0]);
-                                    res.Add(obj);
-                                }
-                                member.SetValue(a, res);
-                            }
-                        }
-                    }
-                    else if (member.FieldType.Assembly.FullName!.Contains("System."))
-                    {
-                        throw new NotImplementedException($"type {member.FieldType} not implemented");
-                    }
-                    else
-                    {
-                        member.SetValue(a, InnerGenerator(member.FieldType));
+                            }*/
                     }
                 }
                 return a;
@@ -248,12 +230,21 @@ namespace MPP_2.MyGenerator
         private static object generateList(Type type)
         {
             object? obj = null;
-            int length = random.Next(10, 20);
+            int length = random.Next(3, 6);
             Type listType = typeof(List<>).MakeGenericType(type.GenericTypeArguments[0]);
             var res = (IList)Convert.ChangeType(Activator.CreateInstance(listType), listType)!;
             for (int i = 0; i < length; i++)
             {
-                obj = Generate(type.GenericTypeArguments[0]);
+                try
+                {
+                    obj = Generate(type.GenericTypeArguments[0]);
+                }
+                catch (KeyNotFoundException) {
+                    var temp = type.GetInterfaces().Where(interf => interf.Name.Contains("ILisy`")).ToList();
+                    if (type.GenericTypeArguments[0].FullName!.Contains("System.") && temp.Count == 1)
+                        throw new NotImplementedException($"Generator for type {type} has not been implemented yet");
+                    throw new KeyNotFoundException();
+                }
                 Convert.ChangeType(obj, type.GenericTypeArguments[0]);
                 res.Add(obj);
             }

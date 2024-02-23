@@ -1,4 +1,5 @@
-﻿using MPP_2.MyFaker;
+﻿using MPP_2.Exceptions;
+using MPP_2.MyFaker;
 using MPP_2.MyGenerator;
 using System.Collections.Generic;
 using System.Linq.Expressions;
@@ -18,25 +19,25 @@ namespace MPP_2.Faker
             Type classType = typeof(TClass);
             Type generatorType = typeof(TGenerator);
             Type fieldType = typeof(TField);
-
+            
             //check if fieldSelector is field or prop
-            MemberInfo? member = (fieldSelector.Body is MemberExpression) ? ((MemberExpression)fieldSelector.Body).Member : throw new Exception("not field or prop");
+            MemberInfo? member = (fieldSelector.Body is MemberExpression) ? ((MemberExpression)fieldSelector.Body).Member : throw new NotPropertyOrFieldException(fieldSelector.Type);
 
             //check if field is TClass field and
             if (member.DeclaringType != classType)
             {
-                throw new Exception("selected field Class and TClass are diferent");
+                throw new ClassMemberException(classType, member);
             }
 
             //check if TGenerator is generator and its type is TField type
             Type[] generatorReturnedTypes = generatorType.GetInterface(typeof(ICustomGenerator<>).FullName!)!.GetGenericArguments();
             if (fieldType != generatorReturnedTypes[0]) 
             {
-                throw new Exception("generator type and fierld type are defferent");
+                throw new GeneratorTypeException(generatorReturnedTypes[0], fieldType);
             }
             if (!generatorType.GetInterfaces().Contains(typeof(ICustomGenerator<>).MakeGenericType(generatorReturnedTypes))) 
             {
-                throw new Exception("not generator");
+                throw new NotGeneratorException(generatorType);
             }
 
             if (!classesConfigs.ContainsKey(classType)) {
