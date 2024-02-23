@@ -1,26 +1,52 @@
 ﻿using MPP_2.MyFaker;
 using MPP_2.MyGenerator;
+using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Reflection;
 
 namespace MPP_2.Faker
 {
     public class FakerConfig 
     {
-        private Dictionary<Type, Dictionary<MemberInfo, ICustomGenerator>> classesConfigs;
+        private Dictionary<Type, Dictionary<MemberInfo, Type>> classesConfigs;
 
-        public FakerConfig() => this.classesConfigs = new Dictionary<Type, Dictionary<MemberInfo, ICustomGenerator>>();
+        public FakerConfig() => this.classesConfigs = new Dictionary<Type, Dictionary<MemberInfo, Type>>();
 
-        public void Add<TClass, TField, TGenerator>(Func<TClass, MemberInfo> fieldSelector) {
+        public Dictionary<MemberInfo, Type> GetClassConfig(Type type) => this.classesConfigs[type];
+
+        public void Add<TClass, TField, TGenerator>(Expression<Func<TClass, TField>> fieldSelector) {
+            Type classType = typeof(TClass);
             Type generatorType = typeof(TGenerator);
-            if (!(generatorType.GetInterfaces().Contains(typeof(ICustomGenerator)))) {
+            Type fieldType = typeof(TField);
+
+            //check if fieldSelector is field or prop
+            MemberInfo? member = (fieldSelector.Body is MemberExpression) ? ((MemberExpression)fieldSelector.Body).Member : throw new Exception("not field or prop");
+
+            //check if field is TClass field and
+            if (member.DeclaringType != classType)
+            {
+                throw new Exception("selected field Class and TClass are diferent");
+            }
+
+            //check if TGenerator is generator and its type is TField type
+            Type[] generatorReturnedTypes = generatorType.GetInterface(typeof(ICustomGenerator<>).FullName!)!.GetGenericArguments();
+            if (fieldType != generatorReturnedTypes[0]) 
+            {
+                throw new Exception("generator type and fierld type are defferent");
+            }
+            if (!generatorType.GetInterfaces().Contains(typeof(ICustomGenerator<>).MakeGenericType(generatorReturnedTypes))) 
+            {
                 throw new Exception("not generator");
             }
-            Type memberType = typeof(TField);
-            /*if(!(field.MemberType == MemberTypes.Field && (field as FieldInfo).FieldType == memberType))
-            {
 
-            }*/
-            int akjjm = 12;
+            if (!classesConfigs.ContainsKey(classType)) {
+                classesConfigs.Add(classType, new Dictionary<MemberInfo, Type>());
+            }
+            Dictionary <MemberInfo, Type> classConfig = classesConfigs[classType];
+            if (!classConfig.ContainsKey(member)) 
+                classConfig.Add(member, generatorType);
+            else
+                classConfig[member] = generatorType;
         }
     }
 }

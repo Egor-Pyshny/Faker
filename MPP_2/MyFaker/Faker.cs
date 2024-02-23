@@ -8,9 +8,8 @@ namespace MPP_2.Faker
         private readonly FakerConfig? config;
         public T Create<T>() {
             Type type = typeof(T);
-
-            var obj = Generators.GenerateDTO(type, config);
-
+            var conf = config == null ? null : config.GetClassConfig(type);
+            var obj = Generators.GenerateDTO(type, conf);
             return (T)obj;
         }
 

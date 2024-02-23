@@ -1,13 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace MPP_2.MyGenerator
+﻿namespace MPP_2.MyGenerator
 {
-    public interface ICustomGenerator
+    public interface ICustomGenerator<T>
     {
-        T Generate<T>();
+        T Generate();
     }
 }

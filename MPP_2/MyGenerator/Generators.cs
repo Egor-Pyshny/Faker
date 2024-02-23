@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Reflection;
+using System.Reflection.Metadata;
 using MPP_2.Faker;
 using MPP_2.MyFaker;
 
@@ -47,14 +48,14 @@ namespace MPP_2.MyGenerator
             return valueGenerators[type](type);
         }
 
-        public static object GenerateDTO(Type type, FakerConfig? config = null)
+        public static object GenerateDTO(Type type, Dictionary<MemberInfo, Type>? config = null)
         {
             HashSet<Type> usedtypes = [];
-
+            if (config != null) config = new Dictionary<MemberInfo, Type>();
             object InnerGenerator(Type type, bool considerType = true)
             {
                 if (!usedtypes.Add(type) && considerType) throw new Exception("LoopDetected");
-                ConstructorInfo constructor = null;
+                ConstructorInfo? constructor = null;
                 var asdasd = type.GetMembers();
                 var privateFields = type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance).Where(field => !field.Name.Contains(">k__BackingField")).ToList();
                 var privateProperties = type.GetProperties(BindingFlags.NonPublic | BindingFlags.Instance).Concat(type.GetProperties().Where(prop => prop.SetMethod == null || prop.SetMethod != null && !prop.SetMethod.IsPublic).ToList()).ToList();
@@ -79,7 +80,17 @@ namespace MPP_2.MyGenerator
                 {
                     try
                     {
-                        parameters.Add(Generate(parameter.ParameterType));
+                        var mList = config!.Keys.Where(member => member.Name == parameter.Name).ToList();
+                        if (mList.Count == 1)
+                        {
+                            var m = mList[0];
+                            var gen = Activator.CreateInstance(config[m]);
+                            Type typeOfT = m.MemberType == MemberTypes.Field ? (m as FieldInfo)!.FieldType : (m as PropertyInfo)!.PropertyType;
+                            MethodInfo generateTypedMethod = config[m].GetMethod("Generate")!;
+                            parameters.Add(generateTypedMethod.Invoke(gen, null)!);
+                        }
+                        else
+                            parameters.Add(Generate(parameter.ParameterType));
                     }
                     catch (KeyNotFoundException)
                     {
@@ -92,11 +103,10 @@ namespace MPP_2.MyGenerator
                 {
                     if (field.IsPublic) fields.Add(field);
                 }
-
                 List<PropertyInfo> properties = new List<PropertyInfo>();
                 foreach (var propertie in type.GetProperties())
                 {
-                    if (propertie.GetMethod!.IsPublic) properties.Add(propertie);
+                    if (propertie.SetMethod!= null && propertie.SetMethod.IsPublic) properties.Add(propertie);
                 }
 
                 List<FieldInfo> fieldErrors = new List<FieldInfo>();
@@ -104,7 +114,16 @@ namespace MPP_2.MyGenerator
                 {
                     try
                     {
-                        field.SetValue(a, Generate(field.FieldType));
+                        var mList = config!.Keys.Where(member => member.Name == field.Name).ToList();
+                        if (mList.Count == 1) {
+                            var m = mList[0];
+                            var gen = Activator.CreateInstance(config[m]);
+                            Type typeOfT = m.MemberType == MemberTypes.Field ? (m as FieldInfo)!.FieldType : (m as PropertyInfo)!.PropertyType;
+                            MethodInfo generateTypedMethod = config[m].GetMethod("Generate")!;
+                            field.SetValue(a, generateTypedMethod.Invoke(gen, null));
+                        }
+                        else
+                            field.SetValue(a, Generate(field.FieldType));
                     }
                     catch (KeyNotFoundException)
                     {
@@ -117,7 +136,17 @@ namespace MPP_2.MyGenerator
                 {
                     try
                     {
-                        prop.SetValue(a, Generate(prop.PropertyType));
+                        var mList = config!.Keys.Where(member => member.Name == prop.Name).ToList();
+                        if (mList.Count == 1)
+                        {
+                            var m = mList[0];
+                            var gen = Activator.CreateInstance(config[m]);
+                            Type typeOfT = m.MemberType == MemberTypes.Field ? (m as FieldInfo)!.FieldType : (m as PropertyInfo)!.PropertyType;
+                            MethodInfo generateTypedMethod = config[m].GetMethod("Generate")!;
+                            prop.SetValue(a, generateTypedMethod.Invoke(gen, null));
+                        }
+                        else
+                            prop.SetValue(a, Generate(prop.PropertyType));
                     }
                     catch (KeyNotFoundException)
                     {
@@ -132,13 +161,13 @@ namespace MPP_2.MyGenerator
                         var f = member.FieldType.GetInterfaces();
                         foreach (var temp in f)
                         {
-                            if (temp.Name.Contains("IList`1") && temp.GenericTypeArguments.Length > 0 && !temp.GenericTypeArguments[0].FullName.Contains("System."))
+                            if (temp.Name.Contains("IList`1") && temp.GenericTypeArguments.Length > 0 && !temp.GenericTypeArguments[0].FullName!.Contains("System."))
                             {
                                 Random random = new Random();
                                 object obj = new object();
                                 int length = random.Next(3, 6);
                                 Type listType = typeof(List<>).MakeGenericType(temp.GenericTypeArguments[0]);
-                                var res = (IList)Convert.ChangeType(Activator.CreateInstance(listType), listType);
+                                var res = (IList)Convert.ChangeType(Activator.CreateInstance(listType), listType)!;
                                 if (!usedtypes.Contains(temp.GenericTypeArguments[0])) res.Add(InnerGenerator(temp.GenericTypeArguments[0]));
                                 for (int i = 0; i < length; i++)
                                 {
@@ -150,7 +179,7 @@ namespace MPP_2.MyGenerator
                             }
                         }
                     }
-                    else if (member.FieldType.Assembly.FullName.Contains("System."))
+                    else if (member.FieldType.Assembly.FullName!.Contains("System."))
                     {
                         throw new NotImplementedException($"type {member.FieldType} not implemented");
                     }
@@ -161,7 +190,7 @@ namespace MPP_2.MyGenerator
                 }
                 return a;
             }
-            if (type.Assembly.FullName.Contains("System."))
+            if (type.Assembly.FullName!.Contains("System."))
                 return Generate(type);
             else
                 return InnerGenerator(type);
@@ -221,7 +250,7 @@ namespace MPP_2.MyGenerator
             object? obj = null;
             int length = random.Next(10, 20);
             Type listType = typeof(List<>).MakeGenericType(type.GenericTypeArguments[0]);
-            var res = (IList)Convert.ChangeType(Activator.CreateInstance(listType), listType);
+            var res = (IList)Convert.ChangeType(Activator.CreateInstance(listType), listType)!;
             for (int i = 0; i < length; i++)
             {
                 obj = Generate(type.GenericTypeArguments[0]);
