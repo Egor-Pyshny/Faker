@@ -4,7 +4,6 @@ using MPP_2.MyGenerator;
 FakerConfig config = new FakerConfig();
 Faker f = new Faker();
 var s = f.Create<TestClass>();
-int a = 7;
 
 public class Gen: ICustomGenerator<int>
 {
@@ -22,12 +21,11 @@ public class TestClass {
     private int t;
     private int y;
     public A cA;
-    public A casA { get; set; }
+
     public int c { get; private set; }
     public int d { private get; set; }
     private int dg {  get; set; }
 
-    public List<List<A>> l;
     public List<int> aasds;
     public int aasd() { return 5; }
     public TestClass(int a) { this.a = a; }
@@ -39,8 +37,6 @@ public class A
 
     public int a;
     public int b;
-
-    public List<A> l;
 
     public A() { }
 }

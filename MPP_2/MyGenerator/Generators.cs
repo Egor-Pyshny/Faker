@@ -98,8 +98,8 @@ namespace MPP_2.MyGenerator
                         parameters.Add(InnerGenerator(parameter.ParameterType));
                     }
                 }
-                var a = constructor.Invoke(parameters.ToArray());
-                List<FieldInfo> fields = new List<FieldInfo>();
+                var newDTO = constructor.Invoke(parameters.ToArray());
+                /*List<FieldInfo> fields = new List<FieldInfo>();
                 foreach (var field in type.GetFields())
                 {
                     if (field.IsPublic) fields.Add(field);
@@ -108,69 +108,139 @@ namespace MPP_2.MyGenerator
                 foreach (var propertie in type.GetProperties())
                 {
                     if (propertie.SetMethod!= null && propertie.SetMethod.IsPublic) properties.Add(propertie);
-                }
+                }*/
 
                 List<MemberInfo> errors = new List<MemberInfo>();
-
-                foreach (var field in fields)
-                {
+                var publicMembers = type.GetMembers().Where(_member => 
+                (_member.MemberType == MemberTypes.Field && (_member as FieldInfo).IsPublic) || 
+                (_member.MemberType == MemberTypes.Property && (_member as PropertyInfo).SetMethod != null && (_member as PropertyInfo).SetMethod.IsPublic))
+                    .ToList();
+                foreach (var member in publicMembers) {
                     try
                     {
-                        var mList = config!.Keys.Where(member => member.Name == field.Name).ToList();
-                        if (mList.Count == 1) {
-                            var m = mList[0];
-                            var gen = Activator.CreateInstance(config[m]);
-                            Type typeOfT = m.MemberType == MemberTypes.Field ? (m as FieldInfo)!.FieldType : (m as PropertyInfo)!.PropertyType;
-                            MethodInfo generateTypedMethod = config[m].GetMethod("Generate")!;
-                            field.SetValue(a, generateTypedMethod.Invoke(gen, null));
-                        }
-                        else
-                            field.SetValue(a, Generate(field.FieldType));
-                    }
-                    catch (KeyNotFoundException)
-                    {
-                        errors.Add(field);
-                    }
-                }
-
-                foreach (var prop in properties)
-                {
-                    try
-                    {
-                        var mList = config!.Keys.Where(member => member.Name == prop.Name).ToList();
+                        var mList = config!.Keys.Where(_member => _member.Name == member.Name).ToList();
+                        object value;
                         if (mList.Count == 1)
                         {
                             var m = mList[0];
                             var gen = Activator.CreateInstance(config[m]);
                             Type typeOfT = m.MemberType == MemberTypes.Field ? (m as FieldInfo)!.FieldType : (m as PropertyInfo)!.PropertyType;
                             MethodInfo generateTypedMethod = config[m].GetMethod("Generate")!;
-                            prop.SetValue(a, generateTypedMethod.Invoke(gen, null));
+                            try
+                            {
+                                if (member.MemberType == MemberTypes.Field)
+                                    (member as FieldInfo).SetValue(newDTO, generateTypedMethod.Invoke(gen, null));
+                                else
+                                    (member as PropertyInfo).SetValue(newDTO, generateTypedMethod.Invoke(gen, null));
+                            }catch (Exception ex)
+                            {
+                                throw new CustomGeneratorException(ex, config[m]);
+                            }
                         }
                         else
-                            prop.SetValue(a, Generate(prop.PropertyType));
+                        {
+                            if (member.MemberType == MemberTypes.Field)
+                                (member as FieldInfo).SetValue(newDTO, Generate((member as FieldInfo).FieldType));
+                            else
+                                (member as PropertyInfo).SetValue(newDTO, Generate((member as PropertyInfo).PropertyType));
+                        }
                     }
                     catch (KeyNotFoundException)
                     {
-                        errors.Add(prop);
-                        object obj;
-                        if (prop.PropertyType.FullName!.Contains("System."))
-                            throw new NotImplementedException($"Generator for type {prop.PropertyType} has not been implemented yet");
-                        else
-                            obj = GenerateDTO(prop.PropertyType);
-                        prop.SetValue(a, obj);
-                    }
-                    foreach (MemberInfo member in errors)
-                    {
-                        Type typeOfMember = member.MemberType == MemberTypes.Field ? (member as FieldInfo)!.FieldType : (member as PropertyInfo)!.PropertyType;
-                        /*var f = member.FieldType.GetInterfaces();
-                        foreach (var temp in f)
-                        {
-                            if (temp.Name.Contains("IList`1") && temp.GenericTypeArguments.Length > 0 && !temp.GenericTypeArguments[0].FullName!.Contains("System."))
-                            {
-                            }*/
+                        errors.Add(member);
                     }
                 }
-                return a;
+                /*                foreach (var field in fields)
+                                {
+                                    try
+                                    {
+                                        var mList = config!.Keys.Where(member => member.Name == field.Name).ToList();
+                                        if (mList.Count == 1) {
+                                            var m = mList[0];
+                                            var gen = Activator.CreateInstance(config[m]);
+                                            Type typeOfT = m.MemberType == MemberTypes.Field ? (m as FieldInfo)!.FieldType : (m as PropertyInfo)!.PropertyType;
+                                            MethodInfo generateTypedMethod = config[m].GetMethod("Generate")!;
+                                            field.SetValue(a, generateTypedMethod.Invoke(gen, null));
+                                        }
+                                        else
+                                            field.SetValue(a, Generate(field.FieldType));
+                                    }
+                                    catch (KeyNotFoundException)
+                                    {
+                                        errors.Add(field);
+                                    }
+                                }
+                                foreach (var prop in properties)
+                                {
+                                    try
+                                    {
+                                        var mList = config!.Keys.Where(member => member.Name == prop.Name).ToList();
+                                        if (mList.Count == 1)
+                                        {
+                                            var m = mList[0];
+                                            var gen = Activator.CreateInstance(config[m]);
+                                            Type typeOfT = m.MemberType == MemberTypes.Field ? (m as FieldInfo)!.FieldType : (m as PropertyInfo)!.PropertyType;
+                                            MethodInfo generateTypedMethod = config[m].GetMethod("Generate")!;
+                                            prop.SetValue(a, generateTypedMethod.Invoke(gen, null));
+                                        }
+                                        else
+                                            prop.SetValue(a, Generate(prop.PropertyType));
+                                    }
+                                    catch (KeyNotFoundException)
+                                    {
+                                        errors.Add(prop);
+                                        object obj;
+                                        if (prop.PropertyType.FullName!.Contains("System."))
+                                            throw new NotImplementedException($"Generator for type {prop.PropertyType} has not been implemented yet");
+                                        else
+                                            obj = GenerateDTO(prop.PropertyType);
+                                        prop.SetValue(a, obj);
+                                    }
+                                }
+                */
+
+                foreach (MemberInfo member in errors)
+                {
+                    Type typeOfMember = member.MemberType == MemberTypes.Field ? (member as FieldInfo)!.FieldType : (member as PropertyInfo)!.PropertyType;
+                    Type intf = typeOfMember.GetInterface("IList`1");
+                    if (intf != null)
+                    {
+                        Type genericType = intf.GenericTypeArguments[0];
+                        while ((intf = intf.GenericTypeArguments[0].GetInterface("IList`1")) != null) { genericType = intf.GenericTypeArguments[0]; }
+                        usedtypes.Add(genericType);
+                        object ListGenerator(Type type) {
+                            object? obj = null;
+                            int length = random.Next(3, 6);
+                            Type listType = typeof(List<>).MakeGenericType(type.GenericTypeArguments[0]);
+                            var res = (IList)Convert.ChangeType(Activator.CreateInstance(listType), listType)!;
+                            for (int i = 0; i < length; i++)
+                            {
+                                if (type.GenericTypeArguments[0].GetInterface("IList`1") != null)
+                                {
+                                    obj = ListGenerator(type.GenericTypeArguments[0]);
+                                }
+                                else
+                                {
+                                    obj = InnerGenerator(type.GenericTypeArguments[0], false);
+                                }
+                                Convert.ChangeType(obj, type.GenericTypeArguments[0]);
+                                res.Add(obj);
+                            }
+                            return res;
+                        }
+                        if (member.MemberType == MemberTypes.Field)
+                            (member as FieldInfo).SetValue(newDTO, ListGenerator((member as FieldInfo).FieldType));
+                        else
+                            (member as PropertyInfo).SetValue(newDTO, ListGenerator((member as PropertyInfo).PropertyType));
+                    }
+                    else {
+                        if (member.MemberType == MemberTypes.Field)
+                            (member as FieldInfo).SetValue(newDTO, InnerGenerator((member as FieldInfo).FieldType));
+                        else
+                            (member as PropertyInfo).SetValue(newDTO, InnerGenerator((member as PropertyInfo).PropertyType));
+                    }
+                }
+                return newDTO;
             }
             if (type.Assembly.FullName!.Contains("System."))
                 return Generate(type);

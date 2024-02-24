@@ -30,14 +30,15 @@ namespace MPP_2.Faker
             }
 
             //check if TGenerator is generator and its type is TField type
-            Type[] generatorReturnedTypes = generatorType.GetInterface(typeof(ICustomGenerator<>).FullName!)!.GetGenericArguments();
+            Type[] generatorReturnedTypes = null;
+            var intf = generatorType.GetInterface(typeof(ICustomGenerator<>).FullName!);
+            if (intf != null)
+                generatorReturnedTypes = intf.GetGenericArguments();
+            else
+                throw new NotGeneratorException(generatorType);
             if (fieldType != generatorReturnedTypes[0]) 
             {
                 throw new GeneratorTypeException(generatorReturnedTypes[0], fieldType);
-            }
-            if (!generatorType.GetInterfaces().Contains(typeof(ICustomGenerator<>).MakeGenericType(generatorReturnedTypes))) 
-            {
-                throw new NotGeneratorException(generatorType);
             }
 
             if (!classesConfigs.ContainsKey(classType)) {
