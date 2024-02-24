@@ -1,9 +1,6 @@
 ﻿using System.Collections;
 using System.Reflection;
-using System.Reflection.Metadata;
 using MPP_2.Exceptions;
-using MPP_2.Faker;
-using MPP_2.MyFaker;
 
 namespace MPP_2.MyGenerator
 {
@@ -199,7 +196,7 @@ namespace MPP_2.MyGenerator
                                 }
                 */
 
-                foreach (MemberInfo member in errors)
+                foreach (var member in errors)
                 {
                     Type typeOfMember = member.MemberType == MemberTypes.Field ? (member as FieldInfo)!.FieldType : (member as PropertyInfo)!.PropertyType;
                     Type intf = typeOfMember.GetInterface("IList`1");

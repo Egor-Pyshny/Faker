@@ -1,6 +1,6 @@
 ﻿using FluentAssertions;
 using MPP_2.Exceptions;
-using MPP_2.Faker;
+using MPP_2.MyFaker;
 
 namespace Tests.FakerConfigTests
 {

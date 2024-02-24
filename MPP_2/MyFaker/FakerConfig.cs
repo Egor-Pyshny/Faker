@@ -1,11 +1,9 @@
 ﻿using MPP_2.Exceptions;
-using MPP_2.MyFaker;
 using MPP_2.MyGenerator;
-using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Reflection;
 
-namespace MPP_2.Faker
+namespace MPP_2.MyFaker
 {
     public class FakerConfig 
     {

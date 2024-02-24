@@ -1,7 +1,6 @@
-﻿using MPP_2.MyFaker;
-using MPP_2.MyGenerator;
+﻿using MPP_2.MyGenerator;
 
-namespace MPP_2.Faker
+namespace MPP_2.MyFaker
 {
     public class Faker : IFaker
     {

@@ -1,4 +1,4 @@
-﻿using MPP_2.Faker;
+﻿using MPP_2.MyFaker;
 using MPP_2.MyGenerator;
 
 FakerConfig config = new FakerConfig();
